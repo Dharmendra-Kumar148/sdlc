@@ -77,6 +77,14 @@ class CompressionViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> cancel() async {
+    LoggerService.warning(LoggerService.ui, "User cancelled export process.");
+    await VideoCompress.cancelCompression();
+    _isProcessing = false;
+    _progress = 0;
+    notifyListeners();
+  }
+
   void clear() {
     _finalMedia = null;
     _progress = 0;

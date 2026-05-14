@@ -25,24 +25,29 @@ class VideoProcessingService {
 
       // Pass 1: Apply Color Filter (if any)
       if (gpuFilter != null) {
-        LoggerService.log(LoggerService.filterEngine, "Pass 1: Applying GPU filter ${layer.type}...");
         final pass1File = File(p.join(tempDir.path, "pass1_${DateTime.now().millisecondsSinceEpoch}.mp4"));
-        final exportConfig = VideoExportConfig(FileInputSource(currentInputFile), pass1File.absolute);
-        
-        await gpuFilter.prepare();
-        final stream = gpuFilter.exportVideoFile(exportConfig);
-        await for (final progress in stream) {
-          if (onProgress != null) onProgress(progress * 0.5);
-        }
-        
-        // Ensure hardware releases the file
-        await Future.delayed(const Duration(milliseconds: 500));
-        
-        if (await pass1File.exists() && await pass1File.length() > 0) {
-          currentInputFile = pass1File;
-          LoggerService.success(LoggerService.filterEngine, "Pass 1 successful: ${pass1File.length()} bytes");
-        } else {
-          throw Exception("Pass 1 failed: Output file missing or empty.");
+        try {
+          LoggerService.log(LoggerService.filterEngine, "Pass 1: Applying GPU filter ${layer.type}...");
+          final exportConfig = VideoExportConfig(FileInputSource(currentInputFile), pass1File.absolute);
+          
+          await gpuFilter.prepare();
+          final stream = gpuFilter.exportVideoFile(exportConfig);
+          await for (final progress in stream) {
+            if (onProgress != null) onProgress(progress * 0.5);
+          }
+          
+          // Ensure hardware releases the file
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          if (await pass1File.exists() && await pass1File.length() > 0) {
+            currentInputFile = pass1File;
+            LoggerService.success(LoggerService.filterEngine, "Pass 1 successful: ${pass1File.length()} bytes");
+          } else {
+            throw Exception("Pass 1 failed: Output file missing or empty.");
+          }
+        } catch (e) {
+          if (await pass1File.exists()) await pass1File.delete();
+          rethrow;
         }
       }
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:video_compress/video_compress.dart';
 import 'package:path_provider/path_provider.dart';
@@ -44,31 +45,36 @@ class CompressionService {
     final originalSize = await File(path).length();
     LoggerService.log(LoggerService.compressionEngine, "Compressing Video: $path ($originalSize bytes)");
 
+    StreamSubscription? subscription;
     if (onProgress != null) {
-      VideoCompress.compressProgress$.subscribe((progress) {
+      subscription = VideoCompress.compressProgress$.subscribe((progress) {
         onProgress(progress / 100);
       });
     }
 
-    // Adaptive Bitrate / Quality Strategy
-    VideoQuality quality = VideoQuality.MediumQuality;
-    if (originalSize > 50 * 1024 * 1024) { // > 50MB
-      quality = VideoQuality.LowQuality;
-    }
+    try {
+      // Adaptive Bitrate / Quality Strategy
+      VideoQuality quality = VideoQuality.MediumQuality;
+      if (originalSize > 50 * 1024 * 1024) { // > 50MB
+        quality = VideoQuality.LowQuality;
+      }
 
-    final info = await VideoCompress.compressVideo(
-      path,
-      quality: quality,
-      deleteOrigin: false,
-      includeAudio: true,
-    );
+      final info = await VideoCompress.compressVideo(
+        path,
+        quality: quality,
+        deleteOrigin: false,
+        includeAudio: true,
+      );
 
-    if (info != null && info.file != null) {
-      final newSize = await info.file!.length();
-      final reduction = ((originalSize - newSize) / originalSize * 100).toStringAsFixed(1);
-      
-      LoggerService.success(LoggerService.compressionEngine, "Video Compressed: $newSize bytes (Reduced by $reduction%)");
-      return info.file;
+      if (info != null && info.file != null) {
+        final newSize = await info.file!.length();
+        final reduction = ((originalSize - newSize) / originalSize * 100).toStringAsFixed(1);
+        
+        LoggerService.success(LoggerService.compressionEngine, "Video Compressed: $newSize bytes (Reduced by $reduction%)");
+        return info.file;
+      }
+    } finally {
+      subscription?.unsubscribe();
     }
     return null;
   }

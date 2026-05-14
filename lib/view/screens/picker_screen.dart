@@ -49,11 +49,24 @@ class PickerScreen extends StatelessWidget {
 
   Future<void> _handlePick(BuildContext context, MediaType type, ImageSource source) async {
     final mediaVM = context.read<MediaViewModel>();
-    Navigator.pop(context); // Close sheet
+    final navigator = Navigator.of(context);
+    
+    debugPrint('[PICKER] Initiating pick: $type from $source');
     
     await mediaVM.pick(type, source);
-    if (mediaVM.selectedMedia != null && context.mounted) {
-      Navigator.pushNamed(context, '/editor');
+    
+    debugPrint('[PICKER] Result - selectedMedia: ${mediaVM.selectedMedia?.file.path}');
+
+    if (mediaVM.selectedMedia != null) {
+      debugPrint('[PICKER] ✅ Media assigned, closing sheet and navigating');
+      
+      // Close the bottom sheet safely
+      navigator.pop(); 
+      
+      // Navigate to editor
+      navigator.pushNamed('/editor');
+    } else {
+      debugPrint('[PICKER] ❌ Pick cancelled or failed');
     }
   }
 }

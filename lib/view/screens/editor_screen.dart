@@ -27,7 +27,13 @@ class _EditorScreenState extends State<EditorScreen> {
     super.initState();
     final media = context.read<MediaViewModel>().selectedMedia;
     if (media != null) {
-      context.read<FilterViewModel>().init(media);
+      // Defer initialization to after the first frame to avoid building while notifying
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.read<FilterViewModel>().init(media);
+        }
+      });
+
       if (media.type == MediaType.video) {
         _videoController = VideoPlayerController.file(media.file)
           ..initialize().then((_) {
@@ -180,7 +186,29 @@ class _EditorScreenState extends State<EditorScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator(color: AppConstants.primaryBlue)),
+      builder: (context) => Consumer<CompressionViewModel>(
+        builder: (context, vm, child) => AlertDialog(
+          backgroundColor: AppConstants.surfaceColor,
+          title: const Text("Processing Media", style: TextStyle(fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LinearProgressIndicator(value: vm.progress, color: AppConstants.primaryBlue, backgroundColor: Colors.white10),
+              const SizedBox(height: 12),
+              Text("${(vm.progress * 100).toInt()}%", style: const TextStyle(fontSize: 12, color: Colors.white54)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                vm.cancel();
+                Navigator.pop(context);
+              },
+              child: const Text("CANCEL", style: TextStyle(color: Colors.redAccent)),
+            ),
+          ],
+        ),
+      ),
     );
 
     await compressionVM.compress(media, filterVM.currentPreset);
