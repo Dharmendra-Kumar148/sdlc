@@ -9,6 +9,7 @@ class MediaModel {
   final int? width;
   final int? height;
   final File? thumbnail;
+  final Duration? duration;
 
   MediaModel({
     required this.file,
@@ -17,6 +18,7 @@ class MediaModel {
     this.width,
     this.height,
     this.thumbnail,
+    this.duration,
   });
 
   String get sizeFormatted => "${(size / 1024 / 1024).toStringAsFixed(2)} MB";

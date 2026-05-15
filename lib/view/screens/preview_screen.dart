@@ -18,11 +18,31 @@ class PreviewScreen extends StatefulWidget {
 
 class _PreviewScreenState extends State<PreviewScreen> {
   VideoPlayerController? _videoController;
+  String? _lastPath;
 
   @override
   void dispose() {
     _videoController?.dispose();
     super.dispose();
+  }
+
+  void _initVideo(File file) {
+    if (_lastPath == file.path) return;
+    _lastPath = file.path;
+    
+    _videoController?.dispose();
+    _videoController = null;
+    
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      _videoController = VideoPlayerController.file(file)
+        ..initialize().then((_) {
+          if (!mounted) return;
+          _videoController!.setLooping(true);
+          _videoController!.play();
+          setState(() {});
+        });
+    });
   }
 
   @override
@@ -34,13 +54,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
       return const Scaffold(body: Center(child: Text("Error: No processed media")));
     }
 
-    if (finalMedia.type == MediaType.video && _videoController == null) {
-      _videoController = VideoPlayerController.file(finalMedia.file)
-        ..initialize().then((_) {
-          _videoController!.setLooping(true);
-          _videoController!.play();
-          setState(() {});
-        });
+    if (finalMedia.type == MediaType.video) {
+      _initVideo(finalMedia.file);
     }
 
     return Scaffold(

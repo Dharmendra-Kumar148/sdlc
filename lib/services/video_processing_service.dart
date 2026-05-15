@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_gpu_video_filters/flutter_gpu_video_filters.dart';
 import 'package:flutter_gpu_filters_interface/flutter_gpu_filters_interface.dart';
 import 'package:path_provider/path_provider.dart';
@@ -97,28 +99,50 @@ class VideoProcessingService {
   Future<File?> _generateGlitchNoiseOverlay(double intensity, String? baseEmojiPath) async {
     try {
       final tempDir = await getTemporaryDirectory();
-      final image = img.Image(width: 1080, height: 1920);
-      
-      // 1. Base Tint for Color Glitch (Semi-transparent Blue/Cyan)
-      img.fill(image, color: img.ColorRgba8(0, 200, 255, (20 * intensity).toInt()));
-
-      // 2. Load Emojis if any
+      Uint8List? emojiBytes;
       if (baseEmojiPath != null) {
-        final emojiBytes = await File(baseEmojiPath).readAsBytes();
+        emojiBytes = await File(baseEmojiPath).readAsBytes();
+      }
+
+      // Offload image processing to background isolate to prevent UI freeze
+      final result = await compute(_generateOverlayTask, {
+        'intensity': intensity,
+        'emojiBytes': emojiBytes,
+      });
+
+      if (result == null) return baseEmojiPath != null ? File(baseEmojiPath) : null;
+
+      final outFile = File(p.join(tempDir.path, "glitch_final_${DateTime.now().millisecondsSinceEpoch}.png"));
+      await outFile.writeAsBytes(result);
+      return outFile;
+    } catch (e) {
+      LoggerService.error(LoggerService.filterEngine, "Glitch overlay generation failed", e);
+      return baseEmojiPath != null ? File(baseEmojiPath) : null;
+    }
+  }
+
+  static Uint8List? _generateOverlayTask(Map<String, dynamic> params) {
+    try {
+      final double intensity = params['intensity'];
+      final Uint8List? emojiBytes = params['emojiBytes'];
+      
+      final image = img.Image(width: 1080, height: 1920);
+      img.fill(image, color: img.ColorRgba8(0, 200, 255, (25 * intensity).toInt()));
+
+      if (emojiBytes != null) {
         final emojiImage = img.decodeImage(emojiBytes);
         if (emojiImage != null) {
           img.compositeImage(image, emojiImage);
         }
       }
 
-      // 3. Noise Blocks
       final rand = Random();
       final blockCount = (30 * intensity).toInt().clamp(10, 60);
       for (int i = 0; i < blockCount; i++) {
         final color = [
-          img.ColorRgba8(0, 255, 255, 150),   // Cyan
-          img.ColorRgba8(255, 0, 255, 150),   // Pink
-          img.ColorRgba8(255, 255, 255, 100), // White
+          img.ColorRgba8(0, 255, 255, 150),
+          img.ColorRgba8(255, 40, 255, 150),
+          img.ColorRgba8(255, 255, 255, 100),
         ][rand.nextInt(3)];
         
         final x = rand.nextInt(1080);
@@ -128,11 +152,9 @@ class VideoProcessingService {
         img.fillRect(image, x1: x, y1: y, x2: x + w, y2: y + h, color: color);
       }
 
-      final outFile = File(p.join(tempDir.path, "glitch_final_${DateTime.now().millisecondsSinceEpoch}.png"));
-      await outFile.writeAsBytes(img.encodePng(image));
-      return outFile;
+      return img.encodePng(image);
     } catch (e) {
-      return baseEmojiPath != null ? File(baseEmojiPath) : null;
+      return null;
     }
   }
 

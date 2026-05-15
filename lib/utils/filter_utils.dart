@@ -216,33 +216,38 @@ class FilterUtils {
         break;
 
       case FilterType.glitch:
-        // Glitch: digital distortion with contrast + color matrix
-        configs.add(GPUContrastConfiguration()..contrast = 1.0 + (intensity * 0.5));
-        
-        final shift = intensity * 0.4;
+        // Digital glitch: Color Matrix + Warp
+        final shift = intensity * 0.3;
         configs.add(GPUColorMatrixConfiguration()
           ..colorMatrix = Matrix4.fromList([
-            1.0 - (shift * 0.5), shift * 0.2, -shift * 0.1, shift * 0.1,
-            -shift * 0.15, 1.0, shift * 0.15, -shift * 0.1,
-            shift * 0.1, -shift * 0.1, 1.0 - (shift * 0.3), shift * 0.15,
+            0.0, 1.2, 0.0, shift,
+            0.0, 0.0, 1.2, shift * 0.5,
+            1.2, 0.0, 0.0, -shift,
             0.0, 0.0, 0.0, 1.0,
           ]));
-
-        // Add pixelation for "broken" digital look
-        configs.add(GPUPixelationConfiguration()..pixel = 2.0 + (intensity * 8.0));
+          
+        configs.add(GPUBulgeDistortionConfiguration()
+          ..radius = 0.5
+          ..scale = intensity * 0.6);
         break;
 
       default:
+        // Fallback for custom bulge layers
+        if (layer.type.name.contains('bulge')) {
+          configs.add(GPUBulgeDistortionConfiguration()
+            ..radius = 0.3
+            ..scale = intensity * 0.5);
+        }
         break;
     }
 
     return configs;
   }
 
-  /// Get single GPU config (backward compatibility)
+  /// Get single GPU config for preview (picks the primary distortion/effect)
   static GPUFilterConfiguration? getGPUConfig(EffectLayer layer) {
     final configs = getGPUConfigs(layer);
-    return configs.isNotEmpty ? configs.first : null;
+    return configs.isNotEmpty ? configs.last : null;
   }
 
   /// Identity/no-op GPU configuration

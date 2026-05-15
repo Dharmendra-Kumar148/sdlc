@@ -113,140 +113,195 @@ class _EditorScreenState extends State<EditorScreen> {
         leading: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
         actions: [
           TextButton(
-            onPressed: () => _finishEditing(context, media),
+            onPressed: () async {
+              LoggerService.log(LoggerService.ui, "Next button clicked - triggering export...");
+              _finishEditing(context, media);
+            },
             child: const Text("NEXT", style: TextStyle(color: AppConstants.primaryBlue, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: Stack(
-              alignment: Alignment.topCenter,
-              children: [
-                Center(
-                  child: Hero(
-                    tag: 'media_preview',
-                    child: GestureDetector(
-                      onLongPressStart: (_) => setState(() => _isComparing = true),
-                      onLongPressEnd: (_) => setState(() => _isComparing = false),
-                      child: Consumer<MakeupViewModel>(
-                        builder: (context, makeupVM, child) {
-                          return Stack(
-                            children: [
-                              ColorFiltered(
-                                colorFilter: (filterVM.currentPreset.layers.isNotEmpty && !_isComparing)
-                                    ? FilterUtils.getFilter(filterVM.currentPreset.layers.first)
-                                    : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
-                                child: media.type == MediaType.image
-                                    ? Image.file(
-                                        media.file, 
-                                        fit: BoxFit.contain,
-                                        cacheWidth: 1080,
-                                        filterQuality: FilterQuality.medium,
-                                      )
-                                    : _videoController?.value.isInitialized ?? false
-                                        ? _gpuController != null
-                                            ? Builder(
-                                                builder: (context) {
-                                                  final gpuController = _gpuController!;
-                                                  final config = filterVM.currentGPUConfig;
-                                                  
-                                                  if (config is GPUBulgeDistortionConfiguration && !_isComparing) {
-                                                    final firstLayer = filterVM.currentPreset.layers.first;
-                                                    final type = firstLayer.type;
-
-                                                    if (type == FilterType.glitch) {
-                                                      final rand = Random();
-                                                      config.center = const Point<double>(0.5, 0.5);
-                                                      config.radius = 0.4 + rand.nextDouble() * 0.3;
-                                                      config.scale = (rand.nextBool() ? 1.0 : -1.0) * (firstLayer.intensity * 0.5);
-                                                      _ensureGlitchAnimation(filterVM);
-                                                    } else if (makeupVM.detectedFaces.isNotEmpty) {
-                                                      final face = makeupVM.detectedFaces.first;
-                                                      Point<int>? targetPos;
+          Column(
+            children: [
+              Expanded(
+                child: Stack(
+                  alignment: Alignment.topCenter,
+                  children: [
+                    Center(
+                      child: Hero(
+                        tag: 'media_preview',
+                        child: GestureDetector(
+                          onLongPressStart: (_) => setState(() => _isComparing = true),
+                          onLongPressEnd: (_) => setState(() => _isComparing = false),
+                          child: Consumer<MakeupViewModel>(
+                            builder: (context, makeupVM, child) {
+                              return Stack(
+                                children: [
+                                  ColorFiltered(
+                                    colorFilter: (filterVM.currentPreset.layers.isNotEmpty && !_isComparing)
+                                        ? FilterUtils.getFilter(filterVM.currentPreset.layers.first)
+                                        : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+                                    child: media.type == MediaType.image
+                                        ? Builder(builder: (context) {
+                                            final isGlitch = filterVM.currentPreset.layers.any((l) => l.type == FilterType.glitch);
+                                            if (isGlitch && !_isComparing) {
+                                              _ensureGlitchAnimation(filterVM);
+                                            }
+                                            return Image.file(
+                                              media.file, 
+                                              fit: BoxFit.contain,
+                                              cacheWidth: 1080,
+                                              filterQuality: FilterQuality.medium,
+                                            );
+                                          })
+                                        : _videoController?.value.isInitialized ?? false
+                                            ? _gpuController != null
+                                                ? Builder(
+                                                    builder: (context) {
+                                                      final gpuController = _gpuController!;
+                                                      final config = filterVM.currentGPUConfig;
                                                       
-                                                      if (type == FilterType.eyeEnlargement) {
-                                                        final left = face.landmarks[FaceLandmarkType.leftEye]?.position;
-                                                        final right = face.landmarks[FaceLandmarkType.rightEye]?.position;
-                                                        if (left != null && right != null) {
-                                                          targetPos = Point<int>((left.x + right.x) ~/ 2, (left.y + right.y) ~/ 2);
-                                                        } else {
-                                                          targetPos = left ?? right;
+                                                      if (config is GPUBulgeDistortionConfiguration && !_isComparing) {
+                                                        final firstLayer = filterVM.currentPreset.layers.first;
+                                                        final type = firstLayer.type;
+
+                                                        if (type == FilterType.glitch) {
+                                                          final rand = Random();
+                                                          config.center = const Point<double>(0.5, 0.5);
+                                                          config.radius = 0.4 + rand.nextDouble() * 0.3;
+                                                          config.scale = (rand.nextBool() ? 1.0 : -1.0) * (firstLayer.intensity * 0.5);
+                                                          _ensureGlitchAnimation(filterVM);
+                                                        } else if (makeupVM.detectedFaces.isNotEmpty) {
+                                                          final face = makeupVM.detectedFaces.first;
+                                                          Point<int>? targetPos;
+                                                          
+                                                          if (type == FilterType.eyeEnlargement) {
+                                                            final left = face.landmarks[FaceLandmarkType.leftEye]?.position;
+                                                            final right = face.landmarks[FaceLandmarkType.rightEye]?.position;
+                                                            if (left != null && right != null) {
+                                                              targetPos = Point<int>((left.x + right.x) ~/ 2, (left.y + right.y) ~/ 2);
+                                                            } else {
+                                                              targetPos = left ?? right;
+                                                            }
+                                                          } else if (type == FilterType.faceSlimming) {
+                                                            targetPos = face.landmarks[FaceLandmarkType.bottomMouth]?.position;
+                                                          }
+
+                                                          if (targetPos != null) {
+                                                            config.center = Point<double>(
+                                                              targetPos.x.toDouble() / (media.width ?? 1080),
+                                                              targetPos.y.toDouble() / (media.height ?? 1920),
+                                                            );
+                                                          }
                                                         }
-                                                      } else if (type == FilterType.faceSlimming) {
-                                                        targetPos = face.landmarks[FaceLandmarkType.bottomMouth]?.position;
                                                       }
+                                                      
+                                                      gpuController.connect(config ?? FilterUtils.identityConfig);
 
-                                                      if (targetPos != null) {
-                                                        config.center = Point<double>(
-                                                          targetPos.x.toDouble() / (media.width ?? 1080),
-                                                          targetPos.y.toDouble() / (media.height ?? 1920),
-                                                        );
-                                                      }
-                                                    }
-                                                  }
-                                                  
-                                                  gpuController.connect(config ?? FilterUtils.identityConfig);
-
-                                                  return RepaintBoundary(
-                                                    child: AspectRatio(
-                                                      aspectRatio: _videoController!.value.aspectRatio, 
-                                                      child: VideoPreview(controller: gpuController),
-                                                    ),
-                                                  );
-                                                },
-                                              )
-                                            : const CircularProgressIndicator()
-                                        : const CircularProgressIndicator(),
-                              ),
-                              if (filterVM.currentPreset.layers.any((l) => l.type == FilterType.glitch) && !_isComparing)
-                                Positioned.fill(
-                                  child: CustomPaint(
-                                    painter: GlitchOverlayPainter(
-                                      intensity: filterVM.currentPreset.layers.first.intensity,
-                                    ),
+                                                      return RepaintBoundary(
+                                                        child: AspectRatio(
+                                                          aspectRatio: _videoController!.value.aspectRatio, 
+                                                          child: VideoPreview(controller: gpuController),
+                                                        ),
+                                                      );
+                                                    },
+                                                  )
+                                                : const CircularProgressIndicator()
+                                            : const CircularProgressIndicator(),
                                   ),
-                                ),
-                              if (makeupVM.detectedFaces.isNotEmpty)
-                                Positioned.fill(
-                                  child: CustomPaint(
-                                    painter: FaceOverlayPainter(
-                                      faces: makeupVM.detectedFaces,
-                                      absoluteImageSize: Size(
-                                        (media.width ?? 1080).toDouble(), 
-                                        (media.height ?? 1920).toDouble()
-                                      ), 
-                                      lipstickColor: makeupVM.lipstickColor,
-                                      lipstickIntensity: makeupVM.lipstickIntensity,
-                                      blushColor: Colors.pinkAccent,
-                                      blushIntensity: _currentCategory == FilterCategory.makeup ? 0.3 : 0.0,
+                                  if (filterVM.currentPreset.layers.any((l) => l.type == FilterType.glitch) && !_isComparing)
+                                    Positioned.fill(
+                                      child: CustomPaint(
+                                        painter: GlitchOverlayPainter(
+                                          intensity: filterVM.currentPreset.layers.first.intensity,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
+                                  if (makeupVM.detectedFaces.isNotEmpty)
+                                    Positioned.fill(
+                                      child: CustomPaint(
+                                        painter: FaceOverlayPainter(
+                                          faces: makeupVM.detectedFaces,
+                                          absoluteImageSize: Size(
+                                            (media.width ?? 1080).toDouble(), 
+                                            (media.height ?? 1920).toDouble()
+                                          ), 
+                                          lipstickColor: makeupVM.lipstickColor,
+                                          lipstickIntensity: makeupVM.lipstickIntensity,
+                                          blushColor: Colors.pinkAccent,
+                                          blushIntensity: _currentCategory == FilterCategory.makeup ? 0.3 : 0.0,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
                       ),
+                    ),
+                    if (_isComparing)
+                      Positioned(
+                        top: 20,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text("ORIGINAL", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              _buildControls(filterVM),
+            ],
+          ),
+          // Persistent Progress Overlay
+          Consumer<CompressionViewModel>(
+            builder: (context, vm, child) {
+              if (!vm.isProcessing) return const SizedBox.shrink();
+              return Container(
+                color: Colors.black87,
+                child: Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 40),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: AppConstants.surfaceColor,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text("PROCESSING MEDIA", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 12)),
+                        const SizedBox(height: 24),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: vm.progress, 
+                            color: AppConstants.primaryBlue, 
+                            backgroundColor: Colors.white10,
+                            minHeight: 8,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text("${(vm.progress * 100).toInt()}%", style: const TextStyle(color: AppConstants.primaryBlue, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 24),
+                        TextButton(
+                          onPressed: () => vm.cancel(),
+                          child: const Text("CANCEL", style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                if (_isComparing)
-                  Positioned(
-                    top: 20,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text("ORIGINAL", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 2)),
-                    ),
-                  ),
-              ],
-            ),
+              );
+            },
           ),
-          _buildControls(filterVM),
         ],
       ),
     );
@@ -409,41 +464,25 @@ class _EditorScreenState extends State<EditorScreen> {
     final compressionVM = context.read<CompressionViewModel>();
     final filterVM = context.read<FilterViewModel>();
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Consumer<CompressionViewModel>(
-        builder: (context, vm, child) => AlertDialog(
-          backgroundColor: AppConstants.surfaceColor,
-          title: const Text("Processing Media", style: TextStyle(fontSize: 16)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              LinearProgressIndicator(value: vm.progress, color: AppConstants.primaryBlue, backgroundColor: Colors.white10),
-              const SizedBox(height: 12),
-              Text("${(vm.progress * 100).toInt()}%", style: const TextStyle(fontSize: 12, color: Colors.white54)),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                vm.cancel();
-                Navigator.pop(context);
-              },
-              child: const Text("CANCEL", style: TextStyle(color: Colors.redAccent)),
-            ),
-          ],
-        ),
-      ),
-    );
+    // CRITICAL: Stop and release preview resources to free up MediaCodec buffers
+    LoggerService.log(LoggerService.ui, "Releasing preview resources for export...");
+    
+    // 1. Pause video playback
+    _videoController?.pause();
+    
+    // 2. Dispose GPU controller to release textures/buffers
+    final oldGpuController = _gpuController;
+    _gpuController = null;
+    if (mounted) setState(() {}); // Remove Preview widget from tree
+    
+    await Future.delayed(const Duration(milliseconds: 100)); // Wait for UI update
+    await oldGpuController?.dispose();
 
+    // Start processing - the UI will now show the built-in Overlay automatically
     await compressionVM.compress(media, filterVM.currentPreset);
     
-    if (context.mounted) {
-      Navigator.pop(context); // Close dialog
-      if (compressionVM.finalMedia != null) {
-        Navigator.pushNamed(context, '/preview');
-      }
+    if (context.mounted && compressionVM.finalMedia != null) {
+      Navigator.pushNamed(context, '/preview');
     }
   }
 }
