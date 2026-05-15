@@ -79,8 +79,11 @@ class LoginScreen extends StatelessWidget {
     );
   }
 
-  void _login(BuildContext context, String provider) {
+  void _login(BuildContext context, String provider) async {
     LoggerService.log(LoggerService.auth, "Login attempt via $provider");
+    
+    // Bypassing real Firebase Auth for now as cloud services are mocked
+    LoggerService.success(LoggerService.auth, "Logged in as guest for session.");
     Navigator.pushReplacementNamed(context, '/dashboard');
   }
 }

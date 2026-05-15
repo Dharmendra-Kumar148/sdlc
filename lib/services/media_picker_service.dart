@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_compress/video_compress.dart';
 import '../model/media/media_model.dart';
 import '../core/logging/logger_service.dart';
 
@@ -41,12 +42,21 @@ class MediaPickerService {
       if (video != null) {
         final file = File(video.path);
         final size = await file.length();
+        
+        LoggerService.log(LoggerService.mediaPicker, "Generating thumbnail for face detection...");
+        final thumbnailFile = await VideoCompress.getFileThumbnail(
+          video.path,
+          quality: 50,
+          position: 0, // Get first frame
+        );
+
         LoggerService.success(LoggerService.mediaPicker, "Video Selected: ${file.path} ($size bytes)");
 
         return MediaModel(
           file: file,
           type: MediaType.video,
           size: size,
+          thumbnail: thumbnailFile,
         );
       }
       LoggerService.info(LoggerService.mediaPicker, "Video picking cancelled.");

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../viewmodel/post_viewmodel.dart';
 import '../../core/constants/app_constants.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -19,8 +21,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
     _controller.forward();
 
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) Navigator.pushReplacementNamed(context, '/login');
+    Future.delayed(const Duration(seconds: 3), () async {
+      if (mounted) {
+        // Ensure fresh session: Clear any old posts and files
+        try {
+          await context.read<PostViewModel>().clearAll();
+        } catch (_) {}
+        
+        Navigator.pushReplacementNamed(context, '/login');
+      }
     });
   }
 

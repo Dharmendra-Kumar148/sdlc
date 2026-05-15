@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:sdlc/core/logging/logger_service.dart';
 import 'package:sdlc/core/constants/app_constants.dart';
 import 'package:sdlc/viewmodel/media_viewmodel.dart';
@@ -8,6 +9,7 @@ import 'package:sdlc/viewmodel/filter_viewmodel.dart';
 import 'package:sdlc/viewmodel/beauty_viewmodel.dart';
 import 'package:sdlc/viewmodel/compression_viewmodel.dart';
 import 'package:sdlc/viewmodel/post_viewmodel.dart';
+import 'package:sdlc/viewmodel/makeup_viewmodel.dart';
 import 'package:sdlc/view/screens/splash_screen.dart';
 import 'package:sdlc/view/screens/login_screen.dart';
 import 'package:sdlc/view/screens/dashboard_screen.dart';
@@ -16,6 +18,7 @@ import 'package:sdlc/view/screens/preview_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   
   debugPrint("DEBUG: main() started");
   LoggerService.info(LoggerService.auth, "System Bootstrapping...");
@@ -30,6 +33,7 @@ void main() async {
         ChangeNotifierProvider(create: (context) => BeautyViewModel(Provider.of<FilterViewModel>(context, listen: false).engine)),
         ChangeNotifierProvider(create: (_) => CompressionViewModel()),
         ChangeNotifierProvider(create: (_) => PostViewModel()),
+        ChangeNotifierProvider(create: (_) => MakeupViewModel()),
       ],
       child: const GaonGramApp(),
     ),

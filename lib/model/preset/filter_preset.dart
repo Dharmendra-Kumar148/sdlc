@@ -12,12 +12,19 @@ enum FilterType {
   skinSmoothing,
   glow,
   glitch,
+  eyeEnlargement,
+  faceSlimming,
+  lipstick,
+  blush,
+  eyeliner,
 }
 
 enum FilterCategory {
   basic,
   cinematic,
   beauty,
+  reshape,
+  makeup,
   effects,
 }
 

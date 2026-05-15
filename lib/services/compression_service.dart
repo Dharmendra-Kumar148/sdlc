@@ -45,7 +45,7 @@ class CompressionService {
     final originalSize = await File(path).length();
     LoggerService.log(LoggerService.compressionEngine, "Compressing Video: $path ($originalSize bytes)");
 
-    StreamSubscription? subscription;
+    Subscription? subscription;
     if (onProgress != null) {
       subscription = VideoCompress.compressProgress$.subscribe((progress) {
         onProgress(progress / 100);

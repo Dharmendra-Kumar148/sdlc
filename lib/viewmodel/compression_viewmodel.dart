@@ -1,14 +1,20 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:video_compress/video_compress.dart';
 import '../model/media/media_model.dart';
 import '../model/preset/filter_preset.dart';
 import '../services/compression_service.dart';
 import '../services/video_processing_service.dart';
 import '../core/logging/logger_service.dart';
 
+import '../services/engine/media_engine.dart';
+import '../services/engine/adapters/isolate_processing_provider.dart';
+import '../services/engine/effects/glitch_gif_service.dart';
+
 class CompressionViewModel extends ChangeNotifier {
   final CompressionService _compressionService = CompressionService();
   final VideoProcessingService _videoService = VideoProcessingService();
+  final MediaEngine _engine = MediaEngine()..setProvider(IsolateProcessingProvider());
 
   MediaModel? _finalMedia;
   MediaModel? get finalMedia => _finalMedia;
@@ -27,13 +33,25 @@ class CompressionViewModel extends ChangeNotifier {
 
     try {
       if (media.type == MediaType.image) {
-        // For images, the filter is already applied in FilterViewModel
-        final compressed = await _compressionService.compressImage(media.file);
-        if (compressed != null) {
+        File? processedFile;
+        
+        // Special case: If glitch is applied to an image, convert to animated GIF
+        if (preset.layers.any((l) => l.type == FilterType.glitch)) {
+          LoggerService.log(LoggerService.filterEngine, "Glitch detected on photo - converting to GIF...");
+          processedFile = await GlitchGifService().createGlitchGif(
+            media.file, 
+            preset.layers.firstWhere((l) => l.type == FilterType.glitch).intensity
+          );
+        } else {
+          // Standard image filter processing
+          processedFile = await _engine.process(media, preset);
+        }
+        
+        if (processedFile != null) {
           _finalMedia = MediaModel(
-            file: compressed,
-            type: MediaType.image,
-            size: await compressed.length(),
+            file: processedFile,
+            type: MediaType.image, // GIFs are handled by Image.file
+            size: await processedFile.length(),
             width: media.width,
             height: media.height,
           );

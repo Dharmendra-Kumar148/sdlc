@@ -80,7 +80,8 @@ class MediaEngine extends ChangeNotifier {
           finalFile = compressed;
           _currentSession!.compressedSize = compressed.lengthSync();
           // Cleanup filtered but uncompressed temp file
-          if (filteredFile.path != compressed.path) {
+          // CRITICAL: Ensure we don't delete the user's original source file!
+          if (filteredFile.path != compressed.path && filteredFile.path != media.file.path) {
             await _cleanupFile(filteredFile);
             _currentSession!.cleanupSuccess = true;
           }

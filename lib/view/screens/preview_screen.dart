@@ -82,10 +82,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _sharePost(context, finalMedia),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
-                        child: const Text("SHARE"),
+                      child: Consumer<PostViewModel>(
+                        builder: (context, postVM, _) => ElevatedButton(
+                          onPressed: postVM.isUploading ? null : () => _sharePost(context, finalMedia),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryBlue),
+                          child: postVM.isUploading 
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Text("SHARE"),
+                        ),
                       ),
                     ),
                   ],
@@ -121,8 +125,26 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
-  void _sharePost(BuildContext context, MediaModel media) {
-    context.read<PostViewModel>().addPost(media);
-    Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
+  void _sharePost(BuildContext context, MediaModel media) async {
+    final postVM = context.read<PostViewModel>();
+    
+    // Show a loading snackbar or indicator
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Uploading post..."), duration: Duration(seconds: 2)),
+    );
+
+    final success = await postVM.createPost(media);
+    
+    if (success && context.mounted) {
+      // Free memory by clearing temporary selections
+      context.read<MediaViewModel>().clear();
+      context.read<CompressionViewModel>().clear();
+      
+      Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Upload failed. Check logs."), backgroundColor: Colors.redAccent),
+      );
+    }
   }
 }
